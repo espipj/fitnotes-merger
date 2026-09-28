@@ -1,0 +1,8 @@
+# Personal backup data must never be committed
+*.fitnotes
+
+node_modules/
+_site/
+*.log
+.DS_Store
+Thumbs.db

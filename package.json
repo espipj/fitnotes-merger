@@ -1,0 +1,14 @@
+{
+  "name": "fitnotes-merger",
+  "version": "1.0.0",
+  "description": "Merge any number of FitNotes .fitnotes backups - CLI, library and browser tool powered by SQLite (WebAssembly)",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test",
+    "cli": "node src/cli.js"
+  },
+  "dependencies": {
+    "sql.js": "^1.13.0"
+  }
+}
