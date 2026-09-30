@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FitNotes Merger — combine your .fitnotes backups</title>
+<meta name="description" content="Merge any number of FitNotes .fitnotes backups entirely in your browser. SQLite compiled to WebAssembly, no uploads, no accounts.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏋️</text></svg>">
+<link rel="stylesheet" href="style.css">
+<script defer src="vendor/sql-wasm.js"></script>
+</head>
+<body>
+<main class="shell">
+  <header class="hero">
+    <p class="eyebrow">FitNotes backup merger · 100% local</p>
+    <h1>Merge <span class="accent">all</span> your backups</h1>
+    <p class="lede">
+      Two phones, one history. Drop any number of <code>.fitnotes</code> files and get a single
+      backup back. Everything runs in your browser on SQLite compiled to WebAssembly —
+      your data never leaves this page.
+    </p>
+  </header>
+
+  <section id="drop" class="dropzone" tabindex="0" role="button" aria-label="Add .fitnotes backups">
+    <input id="file-input" type="file" accept=".fitnotes,application/octet-stream" multiple hidden>
+    <div class="drop-inner">
+      <div class="plate-icon" aria-hidden="true">🏋️</div>
+      <p class="drop-title"><strong>Drop .fitnotes files here</strong></p>
+      <p class="drop-sub">or <button id="pick" class="link" type="button">browse your files</button></p>
+    </div>
+  </section>
+
+  <section id="files-panel" class="panel" hidden>
+    <div class="panel-head">
+      <h2>Backups</h2>
+      <span id="file-count" class="chip">0 files</span>
+    </div>
+    <p class="hint">Choose the <strong>base</strong> backup: its settings, plates, units and exercises win where files disagree.</p>
+    <ul id="file-list" class="file-list"></ul>
+    <button id="merge" class="primary" type="button" disabled>Merge backups</button>
+  </section>
+
+  <section id="progress-panel" class="panel progress-panel" hidden aria-live="polite">
+    <div class="progress-head">
+      <span id="progress-label">Combobulating your sets…</span>
+      <span id="progress-pct" class="pct">0%</span>
+    </div>
+    <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+      <div id="progress-bar" class="progress-bar"></div>
+    </div>
+    <p id="progress-quip" class="quip">Chalking up…</p>
+  </section>
+
+  <section id="result-panel" class="panel" hidden>
+    <div class="panel-head">
+      <h2>Merged 🎉</h2>
+      <span id="result-summary" class="chip"></span>
+    </div>
+    <p id="result-download-row">
+      <button id="download" class="primary" type="button">Download merged backup</button>
+      <span class="hint inline">then copy it to your phone and open it in FitNotes.</span>
+    </p>
+    <div id="report"></div>
+    <details class="rules">
+      <summary>What exactly gets merged?</summary>
+      <ul>
+        <li><strong>Workout history</strong> — union of all sets; a set present in several backups is kept once, and sets logged twice on purpose stay twice.</li>
+        <li><strong>Exercises &amp; categories</strong> — matched by name, ids rewired; missing ones are added.</li>
+        <li><strong>Routines</strong> — copied whole when the name is new; existing routines are left untouched.</li>
+        <li><strong>Body weight, measurements, goals, plates, workout notes</strong> — union, duplicates dropped.</li>
+        <li><strong>Settings</strong> — always taken from the base backup.</li>
+      </ul>
+    </details>
+  </section>
+
+  <section id="error-panel" class="panel error-panel" hidden aria-live="assertive">
+    <h2>That didn’t lift</h2>
+    <p id="error-message"></p>
+  </section>
+
+  <footer class="footer">
+    <span>MIT licensed · nothing is uploaded · <a href="https://github.com/espipj/fitnotes-merger">source on GitHub</a></span>
+    <span class="footer-note">Not affiliated with FitNotes. Always keep your original backups until you have restored the merged one.</span>
+  </footer>
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>
