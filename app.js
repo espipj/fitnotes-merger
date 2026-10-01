@@ -725,6 +725,13 @@ async function inspectBackup(bytes) {
     }
   }
 }
+function readMemorySnapshot() {
+  if (typeof performance === "object" && "memory" in performance) {
+    const mem = performance.memory;
+    return typeof mem?.usedJSHeapSize === "number" ? mem.usedJSHeapSize : 0;
+  }
+  return 0;
+}
 async function mergeBackups(files, options = {}) {
   const { baseIndex, onProgress = () => {
   } } = options;
@@ -760,10 +767,7 @@ async function mergeBackups(files, options = {}) {
       })),
       base
     );
-    if (typeof performance !== "undefined" && "memory" in performance) {
-      const mem = performance.memory;
-      perf.memorySnapshots.set("before_merge", mem?.usedJSHeapSize ?? 0);
-    }
+    perf.memorySnapshots.set("before_merge", readMemorySnapshot());
     const merged = await openDatabase(new Uint8Array(files[base].bytes));
     try {
       const mergeStart = performance.now();
@@ -795,10 +799,7 @@ async function mergeBackups(files, options = {}) {
         exercises: count(merged, "exercise")
       };
       onProgress({ phase: "done", ...totals });
-      if (typeof performance !== "undefined" && "memory" in performance) {
-        const mem = performance.memory;
-        perf.memorySnapshots.set("after_merge", mem?.usedJSHeapSize ?? 0);
-      }
+      perf.memorySnapshots.set("after_merge", readMemorySnapshot());
       const reportTables = [...report.tables.values()];
       const totalOperations = reportTables.reduce((sum, t) => sum + t.added + t.duplicates + t.skipped, 0);
       const perfSummary = {
@@ -1066,7 +1067,7 @@ async function runMerge() {
     await sleep(Math.max(0, MIN_PROGRESS_MS - (performance.now() - startedAt)));
     finishProgress();
     await sleep(650);
-    showResult(result.bytes, result.report, valid);
+    showResult(result.bytes, result.report, valid, result._performance);
   } catch (error) {
     stopProgress();
     showError(error);
@@ -1096,7 +1097,94 @@ function reportTable(rows) {
   }
   return table;
 }
-function showResult(bytes, report, files) {
+function performancePanel(perf) {
+  if (!perf) return null;
+  const panel = document.createElement("details");
+  panel.className = "perf";
+  const summary = document.createElement("summary");
+  summary.className = "perf-summary";
+  summary.textContent = `Performance details \xB7 ${perf.totalDuration.toFixed(2)} ms total, ${perf.operationsPerSecond.toFixed(1)} ops/s`;
+  panel.append(summary);
+  const pre = document.createElement("pre");
+  pre.className = "perf-body";
+  pre.textContent = formatPerformanceText(perf);
+  panel.append(pre);
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.className = "perf-copy";
+  copy.textContent = "Copy stats (JSON)";
+  copy.addEventListener("click", () => {
+    const payload = JSON.stringify(perf, null, 2);
+    if (navigator.clipboard?.writeText && navigator.clipboard.writeText(payload)) {
+      copy.textContent = "Copied";
+      setTimeout(() => {
+        copy.textContent = "Copy stats (JSON)";
+      }, 1800);
+    } else {
+      copy.textContent = "Copy not available";
+      setTimeout(() => {
+        copy.textContent = "Copy stats (JSON)";
+      }, 1800);
+    }
+  });
+  panel.append(copy);
+  return panel;
+}
+function formatPerformanceText(perf) {
+  const lines = [];
+  lines.push("\u{1F3CB}\uFE0F FitNotes Merger Performance Report");
+  lines.push("\u2550".repeat(50));
+  lines.push(`\u23F1  Total time:      ${perf.totalDuration.toFixed(2)} ms`);
+  lines.push(`\u{1F504}  Merge time:      ${perf.mergeDuration.toFixed(2)} ms`);
+  lines.push(`\u{1F4CA}  Operations:      ${perf.totalOperations} total`);
+  lines.push(`\u26A1  Ops/sec:         ${perf.operationsPerSecond.toFixed(1)} ops/s`);
+  lines.push(`\u{1F4C1}  Files merged:    ${perf.phases["open_0"] ? "see per-file breakdown" : "N/A"}`);
+  const sourceCount = Object.keys(perf.phases).filter((key) => key.startsWith("open_")).length;
+  lines.push(`\u{1F4C1}  Files merged:    ${sourceCount}`);
+  lines.push(`\u{1F5C4}\uFE0F   Tables touched:  ${Object.keys(perf.rowCounts).length}`);
+  lines.push("");
+  const sources = [...Array(sourceCount).keys()].map((index) => {
+    const openKey = `open_${index}`;
+    const mergeKey = `merge_${index}`;
+    const openTime = perf.phases[openKey] ?? 0;
+    const mergeTime = perf.phases[mergeKey] ?? 0;
+    return { index, openTime, mergeTime };
+  });
+  if (sources.length) {
+    lines.push("Per-file breakdown:");
+    for (const source of sources) {
+      const fileIndex = source.index;
+      lines.push(`  file ${fileIndex + 1}:`);
+      lines.push(`    Open time:   ${source.openTime.toFixed(2)} ms`);
+      lines.push(`    Merge time:  ${source.mergeTime.toFixed(2)} ms`);
+    }
+    lines.push("");
+  }
+  if (Object.keys(perf.phases).length) {
+    lines.push("Phase timings:");
+    for (const [phase, time] of Object.entries(perf.phases)) {
+      lines.push(`  ${phase.padEnd(15)}: ${Number.isFinite(time) ? time.toFixed(2) : "\u2014"} ms`);
+    }
+    lines.push("");
+  }
+  if (Object.keys(perf.rowCounts).length) {
+    lines.push("Rows processed per table:");
+    for (const [table, count2] of Object.entries(perf.rowCounts)) {
+      lines.push(`  ${table.padEnd(30)}: ${String(count2).padStart(6)} rows`);
+    }
+    lines.push("");
+  }
+  if (perf.memory) {
+    lines.push("Memory usage:");
+    lines.push(`  Before: ${formatBytes2(perf.memory.before)}`);
+    lines.push(`  After:  ${formatBytes2(perf.memory.after)}`);
+    lines.push(`  Delta:  ${formatBytes2(perf.memory.delta)}`);
+    lines.push("");
+  }
+  lines.push("\u2550".repeat(50));
+  return lines.join("\n");
+}
+function showResult(bytes, report, files, perf) {
   const base = files[report.base] ?? files[0];
   dom.resultSummary.textContent = `${report.totals.sets} sets \xB7 ${report.totals.exercises} exercises`;
   if (state.resultUrl) URL.revokeObjectURL(state.resultUrl);
@@ -1115,6 +1203,8 @@ function showResult(bytes, report, files) {
   line.textContent = `Base: ${base.name} \xB7 integrity check: ${report.integrity} \xB7 ${files.length} files merged \xB7 originals untouched`;
   parts.push(line);
   if (report.tables.length) parts.push(reportTable(report.tables));
+  const perfElement = performancePanel(perf);
+  if (perfElement) parts.push(perfElement);
   if (report.warnings.length) {
     const heading = document.createElement("h3");
     heading.textContent = "Notes";
@@ -1130,6 +1220,12 @@ function showResult(bytes, report, files) {
   dom.report.replaceChildren(...parts);
   dom.resultPanel.hidden = false;
   dom.resultPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+function formatBytes2(bytes) {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`;
 }
 function showError(error) {
   dom.errorMessage.textContent = error?.message ?? String(error);

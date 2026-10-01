@@ -663,6 +663,15 @@ export interface MergeResult {
   _performance?: MergePerformance;
 }
 
+/** Helper for optional browser memory usage, where available. */
+function readMemorySnapshot(): number {
+  if (typeof performance === 'object' && 'memory' in performance) {
+    const mem = (performance as Performance & { memory?: { usedJSHeapSize?: number } }).memory;
+    return typeof mem?.usedJSHeapSize === 'number' ? mem.usedJSHeapSize : 0;
+  }
+  return 0;
+}
+
 /**
  * Merges two or more backups.
  *
@@ -716,10 +725,7 @@ export async function mergeBackups(
     );
 
     // Capture initial memory state (if available)
-    if (typeof performance !== 'undefined' && 'memory' in performance) {
-      const mem = (performance as Performance & { memory?: { usedJSHeapSize?: number } }).memory;
-      perf.memorySnapshots.set('before_merge', mem?.usedJSHeapSize ?? 0);
-    }
+    perf.memorySnapshots.set('before_merge', readMemorySnapshot());
 
     const merged = await openDatabase(new Uint8Array(files[base].bytes));
     try {
@@ -763,10 +769,7 @@ export async function mergeBackups(
       onProgress({ phase: 'done', ...totals });
 
       // Capture final memory state (if available)
-      if (typeof performance !== 'undefined' && 'memory' in performance) {
-        const mem = (performance as Performance & { memory?: { usedJSHeapSize?: number } }).memory;
-        perf.memorySnapshots.set('after_merge', mem?.usedJSHeapSize ?? 0);
-      }
+      perf.memorySnapshots.set('after_merge', readMemorySnapshot());
 
       // Calculate total operations - use the report's public tables property
       // Note: report.tables is populated during merge, we need to count from the merge report
