@@ -41,11 +41,26 @@ async function loadRuntime(): Promise<InitSqlJs> {
   runtimePromise = (async () => {
     if (globalThis.initSqlJs) return globalThis.initSqlJs as InitSqlJs;
     if (isBrowser()) {
-      await injectScript(vendorUrl('sql-wasm.js'));
-      if (!globalThis.initSqlJs) throw new Error('vendor/sql-wasm.js did not expose initSqlJs');
+      try {
+        await injectScript(vendorUrl('sql-wasm.js'));
+      } catch (loadError) {
+        throw new Error(
+          `failed to load vendor/sql-wasm.js: ${loadError?.message ?? String(loadError)}. ` +
+            'If the file is missing, serving it from the same directory as index.html usually fixes this.',
+        );
+      }
+      if (!globalThis.initSqlJs) {
+        throw new Error(
+          'vendor/sql-wasm.js loaded but did not expose initSqlJs. ' +
+            'This can happen if the vendored file is outdated or was replaced by a different build.',
+        );
+      }
       return globalThis.initSqlJs as InitSqlJs;
     }
     const mod = await import('sql.js'); // Node (or any bundler resolving node_modules)
+    if (!mod || (!('default' in mod) && typeof mod.initSqlJs !== 'function')) {
+      throw new Error('sql.js did not export an initSqlJs entry point');
+    }
     return (mod.default ?? mod) as InitSqlJs;
   })();
   return runtimePromise;
