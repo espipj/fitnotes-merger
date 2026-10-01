@@ -2,10 +2,11 @@
  * Web UI. All merging happens in the browser through the shared core in
  * src/core/ — this file only handles files, progress and presentation.
  */
-import { inspectBackup, mergeBackups } from './src/core/merge.js';
+
+import { inspectBackup, mergeBackups, type MergeReport, type ProgressEvent } from './src/core/merge.ts';
 
 /* Gym-flavoured status lines shown under the progress bar while merging. */
-const GYM_TALK = [
+const GYM_TALK: string[] = [
   'Chalking up…',
   'Warming up the bar…',
   'Loading plates…',
@@ -30,40 +31,48 @@ const GYM_TALK = [
 
 const MIN_PROGRESS_MS = 1200;
 
-const el = (id) => document.getElementById(id);
+const el = (id: string): HTMLElement | null => document.getElementById(id);
+
 const dom = {
-  drop: el('drop'),
-  fileInput: el('file-input'),
-  pick: el('pick'),
-  filesPanel: el('files-panel'),
-  fileList: el('file-list'),
-  fileCount: el('file-count'),
-  merge: el('merge'),
-  progressPanel: el('progress-panel'),
-  progressBar: el('progress-bar'),
-  progressPct: el('progress-pct'),
-  progressLabel: el('progress-label'),
-  progressQuip: el('progress-quip'),
-  resultPanel: el('result-panel'),
-  resultSummary: el('result-summary'),
-  download: el('download'),
-  report: el('report'),
-  errorPanel: el('error-panel'),
-  errorMessage: el('error-message'),
+  drop: el('drop')!,
+  fileInput: el('file-input') as HTMLInputElement,
+  pick: el('pick')!,
+  filesPanel: el('files-panel')!,
+  fileList: el('file-list')!,
+  fileCount: el('file-count')!,
+  merge: el('merge') as HTMLButtonElement,
+  progressPanel: el('progress-panel')!,
+  progressBar: el('progress-bar')!,
+  progressPct: el('progress-pct')!,
+  progressLabel: el('progress-label')!,
+  progressQuip: el('progress-quip')!,
+  resultPanel: el('result-panel')!,
+  resultSummary: el('result-summary')!,
+  download: el('download') as HTMLButtonElement,
+  report: el('report')!,
+  errorPanel: el('error-panel')!,
+  errorMessage: el('error-message')!,
 };
+
+interface FileState {
+  name: string;
+  size: number;
+  bytes: Uint8Array;
+  info: ReturnType<typeof inspectBackup>;
+}
 
 const state = {
-  files: [],
-  base: null,
+  files: [] as FileState[],
+  base: null as FileState | null,
   busy: false,
-  resultUrl: null,
+  resultUrl: null as string | null,
 };
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 let lastQuip = -1;
-function nextQuip() {
-  let index;
+function nextQuip(): string {
+  let index: number;
   do {
     index = Math.floor(Math.random() * GYM_TALK.length);
   } while (index === lastQuip && GYM_TALK.length > 1);
@@ -71,14 +80,15 @@ function nextQuip() {
   return GYM_TALK[index];
 }
 
-function bestBase() {
+function bestBase(): FileState | null {
   const valid = state.files.filter((file) => file.info.ok);
-  return valid.reduce((best, file) => (
-    !best || file.info.sets > best.info.sets ? file : best
-  ), null);
+  return valid.reduce(
+    (best, file) => ( !best || file.info.sets > best.info.sets ? file : best ),
+    null as FileState | null,
+  );
 }
 
-function renderFiles() {
+function renderFiles(): void {
   const valid = state.files.filter((file) => file.info.ok);
   dom.filesPanel.hidden = state.files.length === 0;
   dom.fileCount.textContent = `${state.files.length} file${state.files.length === 1 ? '' : 's'}`;
@@ -86,7 +96,7 @@ function renderFiles() {
   dom.fileList.replaceChildren(...state.files.map(fileRow));
 }
 
-function fileRow(file) {
+function fileRow(file: FileState): HTMLLIElement {
   const item = document.createElement('li');
   item.className = `file${file.info.ok ? '' : ' invalid'}`;
 
@@ -127,7 +137,7 @@ function fileRow(file) {
   return item;
 }
 
-async function addFiles(fileList) {
+async function addFiles(fileList: FileList | null): Promise<void> {
   if (!fileList?.length) return;
   dom.resultPanel.hidden = true;
   dom.errorPanel.hidden = true;
@@ -145,17 +155,16 @@ async function addFiles(fileList) {
 
 /* ------------------------------------------------------------------ progress */
 
-let quipTimer = null;
+let quipTimer: ReturnType<typeof setInterval> | null = null;
 
-function setProgress(fraction) {
+function setProgress(fraction: number): void {
   const pct = Math.max(0, Math.min(1, fraction));
   dom.progressBar.style.width = `${(pct * 100).toFixed(1)}%`;
   dom.progressPct.textContent = `${Math.round(pct * 100)}%`;
-  dom.progressPanel.querySelector('.progress-track')
-    .setAttribute('aria-valuenow', String(Math.round(pct * 100)));
+  dom.progressPanel.querySelector('.progress-track')!.setAttribute('aria-valuenow', String(Math.round(pct * 100)));
 }
 
-function startProgress() {
+function startProgress(): void {
   clearInterval(quipTimer);
   dom.progressPanel.hidden = false;
   dom.progressPanel.classList.remove('done');
@@ -165,7 +174,7 @@ function startProgress() {
   quipTimer = setInterval(() => { dom.progressQuip.textContent = nextQuip(); }, 1500);
 }
 
-function finishProgress() {
+function finishProgress(): void {
   clearInterval(quipTimer);
   quipTimer = null;
   setProgress(1);
@@ -174,7 +183,7 @@ function finishProgress() {
   dom.progressQuip.textContent = 'Session complete — merged and re-racked. 🏋️';
 }
 
-function stopProgress() {
+function stopProgress(): void {
   clearInterval(quipTimer);
   quipTimer = null;
   dom.progressPanel.hidden = true;
@@ -182,7 +191,7 @@ function stopProgress() {
 
 /* -------------------------------------------------------------------- merge */
 
-async function runMerge() {
+async function runMerge(): Promise<void> {
   const valid = state.files.filter((file) => file.info.ok);
   if (state.busy || valid.length < 2) return;
 
@@ -197,12 +206,12 @@ async function runMerge() {
   let completed = 0;
 
   try {
-    const baseIndex = valid.indexOf(state.base);
-    const { bytes, report } = await mergeBackups(
+    const baseIndex = valid.indexOf(state.base!);
+    const result = await mergeBackups(
       valid.map(({ name, bytes: data }) => ({ name, bytes: data })),
       {
         baseIndex: baseIndex >= 0 ? baseIndex : undefined,
-        onProgress: (event) => {
+        onProgress: (event: ProgressEvent) => {
           if (event.phase === 'merged') {
             completed += 1;
             setProgress(completed / steps);
@@ -218,7 +227,7 @@ async function runMerge() {
     await sleep(Math.max(0, MIN_PROGRESS_MS - (performance.now() - startedAt)));
     finishProgress();
     await sleep(650);
-    showResult(bytes, report, valid);
+    showResult(result.bytes, result.report as MergeReport, valid);
   } catch (error) {
     stopProgress();
     showError(error);
@@ -228,7 +237,7 @@ async function runMerge() {
   }
 }
 
-function reportTable(rows) {
+function reportTable(rows: { table: string; added: number; duplicates: number; skipped: number }[]): HTMLTableElement {
   const table = document.createElement('table');
   table.className = 'report-table';
   const head = document.createElement('tr');
@@ -250,7 +259,7 @@ function reportTable(rows) {
   return table;
 }
 
-function showResult(bytes, report, files) {
+function showResult(bytes: Uint8Array, report: MergeReport, files: FileState[]): void {
   const base = files[report.base] ?? files[0];
   dom.resultSummary.textContent = `${report.totals.sets} sets · ${report.totals.exercises} exercises`;
 
@@ -265,7 +274,7 @@ function showResult(bytes, report, files) {
     link.remove();
   };
 
-  const parts = [];
+  const parts: Node[] = [];
   const line = document.createElement('p');
   line.className = 'result-line';
   line.textContent = `Base: ${base.name} · integrity check: ${report.integrity} · `
@@ -292,7 +301,7 @@ function showResult(bytes, report, files) {
   dom.resultPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-function showError(error) {
+function showError(error: unknown): void {
   dom.errorMessage.textContent = error?.message ?? String(error);
   dom.errorPanel.hidden = false;
   dom.errorPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

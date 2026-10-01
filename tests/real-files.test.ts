@@ -10,26 +10,27 @@
  * its value key, and a key's count in the result must be the maximum count
  * across the input files.
  */
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 
-import { mergeBackups } from '../src/core/merge.js';
-import { openDatabase } from '../src/core/sqlite.js';
-import { count, select } from '../src/core/db.js';
+import { mergeBackups } from '../src/core/merge.ts';
+import { openDatabase } from '../src/core/sqlite.ts';
+import { count, select } from '../src/core/db.ts';
 
 const paths = (process.env.FITNOTES_MERGE_FILES ?? '').split(':').filter(Boolean);
 
-async function setCounts(bytes) {
+async function setCounts(bytes: Uint8Array): Promise<Map<string, number>> {
   const db = await openDatabase(new Uint8Array(bytes));
   try {
-    const names = new Map(select(db, 'SELECT _id, name FROM exercise').map((row) => [row._id, row.name]));
-    const counts = new Map();
+    const names = new Map(select(db, 'SELECT _id, name FROM exercise').map((row) => [row._id as number, row.name as string]));
+    const counts = new Map<string, number>();
     for (const row of select(db, 'SELECT * FROM training_log')) {
       const key = JSON.stringify([
         row.date,
-        names.get(row.exercise_id) ?? `?${row.exercise_id}`,
+        names.get(row.exercise_id as number) ?? `?${row.exercise_id}`,
         row.metric_weight,
         row.reps,
         row.unit,
@@ -54,7 +55,7 @@ test('real backups merge to the expected union', {
   assert.equal(report.tables.find((t) => t.table === 'training_log')?.skipped ?? 0, 0);
 
   const perFile = await Promise.all(files.map((file) => setCounts(file.bytes)));
-  const expected = new Map();
+  const expected = new Map<string, number>();
   for (const counts of perFile) {
     for (const [key, value] of counts) {
       expected.set(key, Math.max(expected.get(key) ?? 0, value));

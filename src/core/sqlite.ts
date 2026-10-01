@@ -7,14 +7,23 @@
  * - Node: the `sql.js` package is imported directly.
  */
 
+import type { Database as SqlJsDatabase } from 'sql.js';
+
 const VENDOR_SCRIPT = new URL('../../vendor/sql-wasm.js', import.meta.url).href;
 const VENDOR_DIR = new URL('../../vendor/', import.meta.url).href;
 
-const isBrowser = () => typeof document !== 'undefined';
+declare global {
+  // eslint-disable-next-line no-var
+  var initSqlJs: typeof initSqlJs | undefined;
+}
 
-let runtimePromise = null;
+type InitSqlJs = typeof initSqlJs;
 
-function injectScript(src) {
+const isBrowser = (): boolean => typeof document !== 'undefined';
+
+let runtimePromise: Promise<InitSqlJs> | null = null;
+
+function injectScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = src;
@@ -24,35 +33,36 @@ function injectScript(src) {
   });
 }
 
-async function loadRuntime() {
+async function loadRuntime(): Promise<InitSqlJs> {
   if (runtimePromise) return runtimePromise;
   runtimePromise = (async () => {
-    if (globalThis.initSqlJs) return globalThis.initSqlJs;
+    if (globalThis.initSqlJs) return globalThis.initSqlJs as InitSqlJs;
     if (isBrowser()) {
       await injectScript(VENDOR_SCRIPT);
       if (!globalThis.initSqlJs) throw new Error('vendor/sql-wasm.js did not expose initSqlJs');
-      return globalThis.initSqlJs;
+      return globalThis.initSqlJs as InitSqlJs;
     }
     const mod = await import('sql.js'); // Node (or any bundler resolving node_modules)
-    return mod.default ?? mod;
+    return (mod.default ?? mod) as InitSqlJs;
   })();
   return runtimePromise;
 }
 
-let sqlitePromise = null;
+let sqlitePromise: Promise<{ Database: typeof SqlJsDatabase }> | null = null;
 
 /** Returns the initialised sql.js module (`{ Database, ... }`). */
-export function getSqlite() {
+export function getSqlite(): Promise<{ Database: typeof SqlJsDatabase }> {
   if (!sqlitePromise) {
-    sqlitePromise = loadRuntime().then((init) =>
-      init(isBrowser() ? { locateFile: (file) => VENDOR_DIR + file } : {}),
+    sqlitePromise = loadRuntime().then(
+      (init) =>
+        init(isBrowser() ? { locateFile: (file: string) => VENDOR_DIR + file } : {}),
     );
   }
   return sqlitePromise;
 }
 
 /** Opens a database from bytes (a copy is made), or an empty one when omitted. */
-export async function openDatabase(bytes) {
+export async function openDatabase(bytes?: Uint8Array): Promise<SqlJsDatabase> {
   const { Database } = await getSqlite();
   return new Database(bytes);
 }

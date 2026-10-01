@@ -1,15 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import type { Database as SqlJsDatabase } from 'sql.js';
 
-import { buildBackup, category, exercise, workoutSet, emptyDatabase } from './helpers.js';
-import { inspectBackup, mergeBackups } from '../src/core/merge.js';
-import { openDatabase } from '../src/core/sqlite.js';
-import { count, insert, integrityCheck, run, select } from '../src/core/db.js';
+import { buildBackup, category, exercise, workoutSet, emptyDatabase } from './helpers.ts';
+import { inspectBackup, mergeBackups, type MergeReport } from '../src/core/merge.ts';
+import { openDatabase } from '../src/core/sqlite.ts';
+import { count, insert, integrityCheck, run, select } from '../src/core/db.ts';
 
-async function withDb(bytes, fn) {
+async function withDb(bytes: Uint8Array, fn: (db: SqlJsDatabase) => Promise<void>): Promise<void> {
   const db = await openDatabase(new Uint8Array(bytes));
   try {
-    return await fn(db);
+    await fn(db);
   } finally {
     db.close();
   }
@@ -55,11 +56,11 @@ test('a set present in several backups is kept once (max, not sum)', async () =>
   });
 
   const merged = await mergeBackups([{ name: 'a', bytes: a }, { name: 'b', bytes: b }]);
-  assert.equal(merged.report.totals.sets, 1);
-  assert.equal(merged.report.tables.find((t) => t.table === 'training_log').duplicates, 1);
+  assert.equal((merged.report as MergeReport).totals.sets, 1);
+  assert.equal((merged.report as MergeReport).tables.find((t) => t.table === 'training_log')?.duplicates, 1);
 
   const reversed = await mergeBackups([{ name: 'b', bytes: b }, { name: 'a', bytes: a }], { baseIndex: 0 });
-  assert.equal(reversed.report.totals.sets, 1);
+  assert.equal((reversed.report as MergeReport).totals.sets, 1);
 });
 
 test('identical sets logged twice on purpose stay twice', async () => {
@@ -70,7 +71,7 @@ test('identical sets logged twice on purpose stay twice', async () => {
   const b = await buildBackup({ ...openChest, training_log: [workoutSet(1, '2026-03-02', 1)] });
 
   const { report } = await mergeBackups([{ name: 'a', bytes: a }, { name: 'b', bytes: b }]);
-  assert.equal(report.totals.sets, 2);
+  assert.equal((report as MergeReport).totals.sets, 2);
 });
 
 test('three backups merge to the same maximum, whichever is the base', async () => {
@@ -78,13 +79,13 @@ test('three backups merge to the same maximum, whichever is the base', async () 
   const [a, b, c] = await Promise.all([mk(), mk(), mk()]);
 
   const forward = await mergeBackups([{ name: 'a', bytes: a }, { name: 'b', bytes: b }, { name: 'c', bytes: c }]);
-  assert.equal(forward.report.totals.sets, 1);
+  assert.equal((forward.report as MergeReport).totals.sets, 1);
 
   const backward = await mergeBackups(
     [{ name: 'c', bytes: c }, { name: 'b', bytes: b }, { name: 'a', bytes: a }],
     { baseIndex: 2 },
   );
-  assert.equal(backward.report.totals.sets, 1);
+  assert.equal((backward.report as MergeReport).totals.sets, 1);
 });
 
 test('routines are copied wholesale by name; existing ones are skipped with a warning', async () => {
@@ -120,8 +121,8 @@ test('routines are copied wholesale by name; existing ones are skipped with a wa
 
   const { bytes, report } = await mergeBackups([{ name: 'a', bytes: a }, { name: 'b', bytes: b }], { baseIndex: 0 });
 
-  assert.equal(report.tables.find((t) => t.table === 'Routine').added, 1);
-  assert.ok(report.warnings.some((w) => w.includes('"Push"')), 'expected a warning about the existing routine');
+  assert.equal((report as MergeReport).tables.find((t) => t.table === 'Routine')?.added, 1);
+  assert.ok((report as MergeReport).warnings.some((w) => w.includes('"Push"')), 'expected a warning about the existing routine');
   await withDb(bytes, (db) => {
     assert.deepEqual(select(db, 'SELECT name FROM Routine ORDER BY name').map((r) => r.name), ['Legs', 'Push']);
     const setRow = select(db, `SELECT s.metric_weight, e.name AS exercise
@@ -137,14 +138,14 @@ test('routines are copied wholesale by name; existing ones are skipped with a wa
 });
 
 test('catalog tables keep the base values and warn on differences', async () => {
-  const plate = (weight) => ({
+  const plate = (weight: number) => ({
     _id: 1, weight, unit: 0, count: 2, enabled: 1, colour: 0, width_ratio: 1, height_ratio: 1,
   });
   const a = await buildBackup({ ...openChest, Plate: [plate(20)] });
   const b = await buildBackup({ ...openChest, Plate: [plate(45)] });
 
   const { bytes, report } = await mergeBackups([{ name: 'a', bytes: a }, { name: 'b', bytes: b }]);
-  assert.ok(report.warnings.some((w) => w.includes('Plate')));
+  assert.ok((report as MergeReport).warnings.some((w) => w.includes('Plate')));
   await withDb(bytes, (db) => {
     assert.equal(count(db, 'Plate'), 1);
     assert.equal(select(db, 'SELECT weight FROM Plate')[0].weight, 20);
@@ -159,9 +160,9 @@ test('rows referencing an unknown exercise are skipped with a warning', async ()
   });
 
   const { bytes, report } = await mergeBackups([{ name: 'a', bytes: a }, { name: 'b', bytes: b }]);
-  assert.equal(report.totals.sets, 1);
-  assert.equal(report.tables.find((t) => t.table === 'training_log').skipped, 1);
-  assert.ok(report.warnings.some((w) => w.includes('unknown exercise')));
+  assert.equal((report as MergeReport).totals.sets, 1);
+  assert.equal((report as MergeReport).tables.find((t) => t.table === 'training_log')?.skipped, 1);
+  assert.ok((report as MergeReport).warnings.some((w) => w.includes('unknown exercise')));
   await withDb(bytes, (db) => {
     assert.equal(integrityCheck(db), 'ok');
   });
