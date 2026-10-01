@@ -738,12 +738,13 @@ async function inspectBackup(bytes) {
     }
   }
 }
+function performanceMemory() {
+  if (typeof performance !== "object" || !("memory" in performance)) return void 0;
+  return performance.memory;
+}
 function readMemorySnapshot() {
-  if (typeof performance === "object" && "memory" in performance) {
-    const mem = performance.memory;
-    return typeof mem?.usedJSHeapSize === "number" ? mem.usedJSHeapSize : 0;
-  }
-  return 0;
+  const mem = performanceMemory();
+  return typeof mem?.usedJSHeapSize === "number" ? mem.usedJSHeapSize : 0;
 }
 async function mergeBackups(files, options = {}) {
   const { baseIndex, onProgress = () => {

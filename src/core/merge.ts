@@ -663,13 +663,21 @@ export interface MergeResult {
   _performance?: MergePerformance;
 }
 
+/** Shape of the non-standard Chrome `performance.memory` API. */
+interface PerformanceMemory {
+  usedJSHeapSize?: number;
+}
+
+/** Returns `performance.memory` when the non-standard API is available. */
+function performanceMemory(): PerformanceMemory | undefined {
+  if (typeof performance !== 'object' || !('memory' in performance)) return undefined;
+  return (performance as { memory?: PerformanceMemory }).memory;
+}
+
 /** Helper for optional browser memory usage, where available. */
 function readMemorySnapshot(): number {
-  if (typeof performance === 'object' && 'memory' in performance) {
-    const mem = (performance as Performance & { memory?: { usedJSHeapSize?: number } }).memory;
-    return typeof mem?.usedJSHeapSize === 'number' ? mem.usedJSHeapSize : 0;
-  }
-  return 0;
+  const mem = performanceMemory();
+  return typeof mem?.usedJSHeapSize === 'number' ? mem.usedJSHeapSize : 0;
 }
 
 /**
