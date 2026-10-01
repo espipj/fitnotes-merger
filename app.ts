@@ -3,7 +3,7 @@
  * src/core/ — this file only handles files, progress and presentation.
  */
 
-import { inspectBackup, mergeBackups, type MergeReport, type ProgressEvent } from './src/core/merge.js';
+import { inspectBackup, mergeBackups, type MergePerformance, type MergeReport, type ProgressEvent } from './src/core/merge.js';
 
 /* Gym-flavoured status lines shown under the progress bar while merging. */
 const GYM_TALK: string[] = [
@@ -227,7 +227,7 @@ async function runMerge(): Promise<void> {
     await sleep(Math.max(0, MIN_PROGRESS_MS - (performance.now() - startedAt)));
     finishProgress();
     await sleep(650);
-    showResult(result.bytes, result.report as MergeReport, valid);
+    showResult(result.bytes, result.report, valid, result._performance);
   } catch (error) {
     stopProgress();
     showError(error);
@@ -259,7 +259,103 @@ function reportTable(rows: { table: string; added: number; duplicates: number; s
   return table;
 }
 
-function showResult(bytes: Uint8Array, report: MergeReport, files: FileState[]): void {
+function performancePanel(perf: MergePerformance | undefined): HTMLDetailsElement | null {
+  if (!perf) return null;
+
+  const panel = document.createElement('details');
+  panel.className = 'perf';
+
+  const summary = document.createElement('summary');
+  summary.className = 'perf-summary';
+  summary.textContent = `Performance details · ${perf.totalDuration.toFixed(2)} ms total, ${perf.operationsPerSecond.toFixed(1)} ops/s`;
+  panel.append(summary);
+
+  const pre = document.createElement('pre');
+  pre.className = 'perf-body';
+  pre.textContent = formatPerformanceText(perf);
+  panel.append(pre);
+
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'perf-copy';
+  copy.textContent = 'Copy stats (JSON)';
+  copy.addEventListener('click', () => {
+    const payload = JSON.stringify(perf, null, 2);
+    if (navigator.clipboard?.writeText && navigator.clipboard.writeText(payload)) {
+      copy.textContent = 'Copied';
+      setTimeout(() => { copy.textContent = 'Copy stats (JSON)'; }, 1800);
+    } else {
+      copy.textContent = 'Copy not available';
+      setTimeout(() => { copy.textContent = 'Copy stats (JSON)'; }, 1800);
+    }
+  });
+  panel.append(copy);
+
+  return panel;
+}
+
+function formatPerformanceText(perf: MergePerformance): string {
+  const lines: string[] = [];
+  lines.push('🏋️ FitNotes Merger Performance Report');
+  lines.push('═'.repeat(50));
+  lines.push(`⏱  Total time:      ${perf.totalDuration.toFixed(2)} ms`);
+  lines.push(`🔄  Merge time:      ${perf.mergeDuration.toFixed(2)} ms`);
+  lines.push(`📊  Operations:      ${perf.totalOperations} total`);
+  lines.push(`⚡  Ops/sec:         ${perf.operationsPerSecond.toFixed(1)} ops/s`);
+  lines.push(`📁  Files merged:    ${perf.phases['open_0'] ? 'see per-file breakdown' : 'N/A'}`);
+  const sourceCount = Object.keys(perf.phases).filter((key) => key.startsWith('open_')).length;
+  lines.push(`📁  Files merged:    ${sourceCount}`);
+  lines.push(`🗄️   Tables touched:  ${Object.keys(perf.rowCounts).length}`);
+  lines.push('');
+
+  const sources = [...Array(sourceCount).keys()].map((index) => {
+    const openKey = `open_${index}`;
+    const mergeKey = `merge_${index}`;
+    const openTime = perf.phases[openKey] ?? 0;
+    const mergeTime = perf.phases[mergeKey] ?? 0;
+    return { index, openTime, mergeTime };
+  });
+
+  if (sources.length) {
+    lines.push('Per-file breakdown:');
+    for (const source of sources) {
+      const fileIndex = source.index;
+      lines.push(`  file ${fileIndex + 1}:`);
+      lines.push(`    Open time:   ${source.openTime.toFixed(2)} ms`);
+      lines.push(`    Merge time:  ${source.mergeTime.toFixed(2)} ms`);
+    }
+    lines.push('');
+  }
+
+  if (Object.keys(perf.phases).length) {
+    lines.push('Phase timings:');
+    for (const [phase, time] of Object.entries(perf.phases)) {
+      lines.push(`  ${phase.padEnd(15)}: ${Number.isFinite(time) ? time.toFixed(2) : '—'} ms`);
+    }
+    lines.push('');
+  }
+
+  if (Object.keys(perf.rowCounts).length) {
+    lines.push('Rows processed per table:');
+    for (const [table, count] of Object.entries(perf.rowCounts)) {
+      lines.push(`  ${table.padEnd(30)}: ${String(count).padStart(6)} rows`);
+    }
+    lines.push('');
+  }
+
+  if (perf.memory) {
+    lines.push('Memory usage:');
+    lines.push(`  Before: ${formatBytes(perf.memory.before)}`);
+    lines.push(`  After:  ${formatBytes(perf.memory.after)}`);
+    lines.push(`  Delta:  ${formatBytes(perf.memory.delta)}`);
+    lines.push('');
+  }
+
+  lines.push('═'.repeat(50));
+  return lines.join('\n');
+}
+
+function showResult(bytes: Uint8Array, report: MergeReport, files: FileState[], perf?: MergePerformance): void {
   const base = files[report.base] ?? files[0];
   dom.resultSummary.textContent = `${report.totals.sets} sets · ${report.totals.exercises} exercises`;
 
@@ -283,6 +379,9 @@ function showResult(bytes: Uint8Array, report: MergeReport, files: FileState[]):
 
   if (report.tables.length) parts.push(reportTable(report.tables));
 
+  const perfElement = performancePanel(perf);
+  if (perfElement) parts.push(perfElement);
+
   if (report.warnings.length) {
     const heading = document.createElement('h3');
     heading.textContent = 'Notes';
@@ -299,6 +398,13 @@ function showResult(bytes: Uint8Array, report: MergeReport, files: FileState[]):
   dom.report.replaceChildren(...parts);
   dom.resultPanel.hidden = false;
   dom.resultPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`;
 }
 
 function showError(error: unknown): void {
