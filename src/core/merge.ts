@@ -768,8 +768,10 @@ export async function mergeBackups(
         perf.memorySnapshots.set('after_merge', mem?.usedJSHeapSize ?? 0);
       }
 
-      // Calculate total operations
-      const totalOperations = Array.from(report.tables ?? []).reduce((sum, t) => sum + t.added + t.duplicates + t.skipped, 0);
+      // Calculate total operations - use the report's public tables property
+      // Note: report.tables is populated during merge, we need to count from the merge report
+      const reportTables = [...report.tables.values()];
+      const totalOperations = reportTables.reduce((sum, t) => sum + t.added + t.duplicates + t.skipped, 0);
 
       // Performance summary for "nerds"
       const perfSummary: MergePerformance = {
@@ -832,9 +834,10 @@ export async function mergeBackups(
       }
       console.log('═'.repeat(50));
 
+      const resultBaseIndex = base;
       return {
         bytes: merged.export(),
-        baseIndex: base,
+        baseIndex: resultBaseIndex,
         report: report.finish({ integrity, totals }),
         _performance: perfSummary,
       };

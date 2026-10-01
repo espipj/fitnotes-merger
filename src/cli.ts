@@ -88,16 +88,16 @@ try {
 
   const span = report.files.reduce(
     (acc, file) => [
-      [acc[0], file.firstDate].filter(Boolean).sort()[0],
-      [acc[1], file.lastDate].filter(Boolean).sort().at(-1),
+      [acc[0], file.firstDate].filter(Boolean).sort()[0] ?? null,
+      [acc[1], file.lastDate].filter(Boolean).sort().at(-1) ?? null,
     ],
     [null as string | null, null as string | null] as [string | null, string | null],
   );
   console.log(
     `result: integrity ${report.integrity}, ${report.totals.sets} sets, ` +
-      `${report.totals.exercises} exercises, ${span[0]} .. ${span[1]}`,
+      `${report.totals.exercises} exercises, ${span[0] ?? '—'} .. ${span[1] ?? '—'}`,
   );
-} catch (error) {
-  console.error(`error: ${error?.message ?? error}`);
+} catch (error: unknown) {
+  console.error(`error: ${(error as Error)?.message ?? error}`);
   process.exit(1);
 }

@@ -194,21 +194,7 @@ export interface ValueAdapter {
   key: (row: DbRow, name: NameFn) => string;
 }
 
-type NameFn = (
-  entity: string,
-  value: number | string | null | undefined,
-) => string;
-
-declare module './merge.js' {
-  // Re-export for merge.js consumers
-  export {
-    ENTITIES,
-    ROUTINE,
-    TRAINING_LOG,
-    VALUE_TABLES,
-    STATIC_TABLES,
-    type EntityAdapter,
-    type RoutineAdapter,
-    type ValueAdapter,
-  };
-}
+export type NameFn = {
+  (entity: string, value: number | string | null | undefined): string;
+  list: (entity: string, value: unknown) => string;
+};

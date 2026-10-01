@@ -14,10 +14,10 @@ const VENDOR_DIR = new URL('../../vendor/', import.meta.url).href;
 
 declare global {
   // eslint-disable-next-line no-var
-  var initSqlJs: typeof initSqlJs | undefined;
+  var initSqlJs: (config?: SqlJsConfig) => Promise<SqlJsStatic> | undefined;
 }
 
-type InitSqlJs = typeof initSqlJs;
+type InitSqlJs = (config?: SqlJsConfig) => Promise<SqlJsStatic>;
 
 const isBrowser = (): boolean => typeof document !== 'undefined';
 
