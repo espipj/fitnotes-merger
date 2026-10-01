@@ -1,8 +1,8 @@
 /** Builds synthetic FitNotes backups for the tests, using the real schema. */
 
 import { readFileSync } from 'node:fs';
-import { openDatabase } from '../src/core/sqlite.ts';
-import { insert, run } from '../src/core/db.ts';
+import { openDatabase } from '../src/core/sqlite.js';
+import { insert, run } from '../src/core/db.js';
 
 const rawSchema = readFileSync(new URL('./fixtures/schema.sql', import.meta.url), 'utf8');
 const STATEMENTS = rawSchema

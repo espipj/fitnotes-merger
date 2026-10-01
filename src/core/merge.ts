@@ -19,7 +19,7 @@
  */
 
 import type { Database as SqlJsDatabase } from 'sql.js';
-import { getSqlite, openDatabase } from './sqlite.ts';
+import { getSqlite, openDatabase } from './sqlite.js';
 import {
   all,
   count,
@@ -30,7 +30,7 @@ import {
   userVersion,
   type DbRow,
   type TableSchema,
-} from './db.ts';
+} from './db.js';
 import {
   ENTITIES,
   ROUTINE,
@@ -40,7 +40,7 @@ import {
   type EntityAdapter,
   type RoutineAdapter,
   type ValueAdapter,
-} from './adapters.ts';
+} from './adapters.js';
 
 interface NameTableSpec {
   table: string;

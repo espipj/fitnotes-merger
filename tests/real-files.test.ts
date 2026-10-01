@@ -16,9 +16,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 
-import { mergeBackups } from '../src/core/merge.ts';
-import { openDatabase } from '../src/core/sqlite.ts';
-import { count, select } from '../src/core/db.ts';
+import { mergeBackups } from '../src/core/merge.js';
+import { openDatabase } from '../src/core/sqlite.js';
+import { count, select } from '../src/core/db.js';
 
 const paths = (process.env.FITNOTES_MERGE_FILES ?? '').split(':').filter(Boolean);
 

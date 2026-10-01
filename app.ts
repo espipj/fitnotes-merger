@@ -3,7 +3,7 @@
  * src/core/ — this file only handles files, progress and presentation.
  */
 
-import { inspectBackup, mergeBackups, type MergeReport, type ProgressEvent } from './src/core/merge.ts';
+import { inspectBackup, mergeBackups, type MergeReport, type ProgressEvent } from './src/core/merge.js';
 
 /* Gym-flavoured status lines shown under the progress bar while merging. */
 const GYM_TALK: string[] = [

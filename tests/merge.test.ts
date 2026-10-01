@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Database as SqlJsDatabase } from 'sql.js';
 
-import { buildBackup, category, exercise, workoutSet, emptyDatabase } from './helpers.ts';
-import { inspectBackup, mergeBackups, type MergeReport } from '../src/core/merge.ts';
-import { openDatabase } from '../src/core/sqlite.ts';
-import { count, insert, integrityCheck, run, select } from '../src/core/db.ts';
+import { buildBackup, category, exercise, workoutSet, emptyDatabase } from './helpers.js';
+import { inspectBackup, mergeBackups, type MergeReport } from '../src/core/merge.js';
+import { openDatabase } from '../src/core/sqlite.js';
+import { count, insert, integrityCheck, run, select } from '../src/core/db.js';
 
 async function withDb(bytes: Uint8Array, fn: (db: SqlJsDatabase) => Promise<void>): Promise<void> {
   const db = await openDatabase(new Uint8Array(bytes));
