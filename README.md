@@ -40,14 +40,22 @@ The result is verified with `PRAGMA integrity_check` before it is handed back.
 ## CLI
 
 ```bash
-npm install
-node src/cli.js -o merged.fitnotes backup-old.fitnotes backup-new.fitnotes [more.fitnotes ...]
+pnpm install
+pnpm cli -o merged.fitnotes backup-old.fitnotes backup-new.fitnotes [more.fitnotes ...]
 
 # optional: choose which file supplies settings/plates
-node src/cli.js --base backup-new.fitnotes -o merged.fitnotes backup-old.fitnotes backup-new.fitnotes
+pnpm cli --base backup-new.fitnotes -o merged.fitnotes backup-old.fitnotes backup-new.fitnotes
+
+# dry run: merge and report without writing anything
+pnpm cli --dry-run -o merged.fitnotes backup-old.fitnotes backup-new.fitnotes
+
+# machine-readable report on stdout (--silent keeps pnpm's banner out of the pipe)
+pnpm --silent cli --json -o merged.fitnotes backup-old.fitnotes backup-new.fitnotes | jq .
 ```
 
-It prints a per-table report of added/duplicate/skipped rows and any warnings.
+It prints per-file progress on stderr, then a per-table report of added/duplicate/skipped
+rows and any warnings. With `--json` it prints the report as a single JSON object on stdout
+instead and skips the console performance report.
 
 ## Library
 
@@ -71,10 +79,12 @@ returns `{ ok, sets, exercises, firstDate, lastDate, userVersion }` for previews
 ## Development
 
 ```bash
-npm install
-npm test          # unit tests; see below for the real-backup integration test
+pnpm install
+pnpm test         # unit tests; see below for the real-backup integration test
 
-# run the website locally (ES modules and the wasm need http, not file://)
+# build the browser bundle, then run the website locally
+# (ES modules and the wasm need http, not file://)
+pnpm build
 python3 -m http.server 4173
 # then open http://localhost:4173/
 ```
@@ -82,24 +92,24 @@ python3 -m http.server 4173
 Integration test against real backups (paths never committed):
 
 ```bash
-FITNOTES_MERGE_FILES="$HOME/a.fitnotes:$HOME/b.fitnotes" npm test
+FITNOTES_MERGE_FILES="$HOME/a.fitnotes:$HOME/b.fitnotes" pnpm test
 ```
 
 ### Layout
 
 ```
-index.html app.js style.css    website (GitHub Pages root)
+index.html app.ts style.css    website source (app.js is built from app.ts)
 vendor/                        sql.js + SQLite wasm, vendored (no CDN)
-src/core/sqlite.js             loads sql.js in browser and Node
-src/core/db.js                 small helpers over a SQLite handle
-src/core/adapters.js           declarative per-table merge rules
-src/core/merge.js              engine + report
-src/cli.js                     CLI using the same core
+src/core/sqlite.ts             loads sql.js in browser and Node
+src/core/db.ts                 small helpers over a SQLite handle
+src/core/adapters.ts           declarative per-table merge rules
+src/core/merge.ts              engine + report
+src/cli.ts                     CLI using the same core
 tests/                         node:test unit tests + fixtures
 ```
 
 Adding support for a new FitNotes table (or a new schema version) means adding an entry in
-`src/core/adapters.js` — the engine does not know about individual tables.
+`src/core/adapters.ts` — the engine does not know about individual tables.
 
 ## Caveats
 
