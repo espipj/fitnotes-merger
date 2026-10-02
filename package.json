@@ -5,10 +5,17 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "test": "node --test",
-    "cli": "node src/cli.js"
+    "build": "esbuild app.ts --bundle --format=esm --platform=browser --target=es2022 --external:sql.js --outfile=app.js",
+    "test": "tsx --test",
+    "cli": "tsx src/cli.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.6.0"
   },
   "dependencies": {
-    "sql.js": "^1.13.0"
+    "sql.js": "^1.14.2"
   }
 }

@@ -19,8 +19,10 @@
  * `remapList` is like `remap` for comma-separated id lists.
  */
 
+import type { DbRow } from './db.js';
+
 /** Rows joined by name; the resulting maps are used by every `remap`. */
-export const ENTITIES = [
+export const ENTITIES: EntityAdapter[] = [
   { entity: 'category', table: 'Category', matchBy: 'name' },
   {
     entity: 'exercise',
@@ -33,7 +35,7 @@ export const ENTITIES = [
 ];
 
 /** Routines are copied as a tree, matched by name. */
-export const ROUTINE = {
+export const ROUTINE: RoutineAdapter = {
   table: 'Routine',
   matchBy: 'name',
   children: [
@@ -57,7 +59,7 @@ export const ROUTINE = {
  * that a set logged twice on purpose is kept twice, while a set present in
  * several backups is only kept once.
  */
-export const TRAINING_LOG = {
+export const TRAINING_LOG: ValueAdapter = {
   table: 'training_log',
   remap: { exercise_id: 'exercise' },
   onUnknownRef: 'skip',
@@ -74,7 +76,7 @@ export const TRAINING_LOG = {
 };
 
 /** Everything else that carries user data, in dependency order. */
-export const VALUE_TABLES = [
+export const VALUE_TABLES: ValueAdapter[] = [
   {
     table: 'Barbell',
     remap: { exercise_id: 'exercise' },
@@ -154,3 +156,45 @@ export const VALUE_TABLES = [
 
 /** Catalog/config tables: the base file always wins, differences are warned. */
 export const STATIC_TABLES = ['settings', 'MeasurementUnit', 'Plate', 'android_metadata'];
+
+// ---------------------------------------------------------------------------
+
+type RemapSpec = Record<string, string>;
+type RemapOptionalSpec = Record<string, { entity: string; fallback: number | null }>;
+type RemapListSpec = Record<string, string>;
+
+export interface EntityAdapter {
+  entity: string;
+  table: string;
+  matchBy: string;
+  remap?: RemapSpec;
+  onUnknownRef?: 'skip' | 'keep';
+}
+
+export interface RoutineAdapter {
+  table: string;
+  matchBy: string;
+  children: {
+    table: string;
+    fk: string;
+    entity: string;
+    remap?: RemapSpec;
+  }[];
+}
+
+export interface ValueAdapter {
+  table: string;
+  entity?: string;
+  matchBy?: never;
+  remap?: RemapSpec;
+  remapOptional?: RemapOptionalSpec;
+  remapList?: RemapListSpec;
+  onUnknownRef?: 'skip' | 'keep';
+  note?: string;
+  key: (row: DbRow, name: NameFn) => string;
+}
+
+export type NameFn = {
+  (entity: string, value: number | string | null | undefined): string;
+  list: (entity: string, value: unknown) => string;
+};
