@@ -672,9 +672,9 @@ export interface MergeResult {
  */
 export async function mergeBackups(
   files: { name: string; bytes: Uint8Array }[],
-  options: { baseIndex?: number; onProgress?: (event: ProgressEvent) => void } = {},
+  options: { baseIndex?: number; onProgress?: (event: ProgressEvent) => void; logStats?: boolean } = {},
 ): Promise<MergeResult> {
-  const { baseIndex, onProgress = () => {} } = options;
+  const { baseIndex, onProgress = () => {}, logStats = true } = options;
   if (!Array.isArray(files) || files.length < 2) {
     throw new Error('pass at least two backups to merge');
   }
@@ -795,44 +795,46 @@ export async function mergeBackups(
         };
       }
 
-      // Log to console for developers/nerds
-      console.log('🏋️ FitNotes Merger Performance Report');
-      console.log('═'.repeat(50));
-      console.log(`⏱  Total time:      ${perfSummary.totalDuration.toFixed(2)} ms`);
-      console.log(`🔄  Merge time:      ${perfSummary.mergeDuration.toFixed(2)} ms`);
-      console.log(`📊  Operations:      ${perfSummary.totalOperations} total`);
-      console.log(`⚡  Ops/sec:         ${perfSummary.operationsPerSecond.toFixed(1)} ops/s`);
-      console.log(`📁  Files merged:    ${files.length}`);
-      console.log(`🗄️   Tables touched:  ${perfSummary.rowCounts ? Object.keys(perfSummary.rowCounts).length : 'N/A'}`);
-      console.log('');
-      console.log('Per-file breakdown:');
-      for (const source of sources) {
-        const phaseTime = perf.phases.get(`merge_${source.index}`) ?? 0;
-        console.log(`  ${source.name}:`);
-        console.log(`    Sets:        ${source.stats.sets}`);
-        console.log(`    Exercises:   ${source.stats.exercises}`);
-        console.log(`    Merge time:  ${phaseTime.toFixed(2)} ms`);
-      }
-      console.log('');
-      console.log('Phase timings:');
-      for (const [phase, time] of perf.phases) {
-        console.log(`  ${phase.padEnd(15)}: ${time.toFixed(2)} ms`);
-      }
-      if (perfSummary.rowCounts && Object.keys(perfSummary.rowCounts).length > 0) {
+      // Log to console for developers/nerds (opt out with logStats: false)
+      if (logStats) {
+        console.log('🏋️ FitNotes Merger Performance Report');
+        console.log('═'.repeat(50));
+        console.log(`⏱  Total time:      ${perfSummary.totalDuration.toFixed(2)} ms`);
+        console.log(`🔄  Merge time:      ${perfSummary.mergeDuration.toFixed(2)} ms`);
+        console.log(`📊  Operations:      ${perfSummary.totalOperations} total`);
+        console.log(`⚡  Ops/sec:         ${perfSummary.operationsPerSecond.toFixed(1)} ops/s`);
+        console.log(`📁  Files merged:    ${files.length}`);
+        console.log(`🗄️   Tables touched:  ${perfSummary.rowCounts ? Object.keys(perfSummary.rowCounts).length : 'N/A'}`);
         console.log('');
-        console.log('Rows processed per table:');
-        for (const [table, count] of Object.entries(perfSummary.rowCounts) as [string, number][]) {
-          console.log(`  ${table.padEnd(30)}: ${count.toString().padStart(6)} rows`);
+        console.log('Per-file breakdown:');
+        for (const source of sources) {
+          const phaseTime = perf.phases.get(`merge_${source.index}`) ?? 0;
+          console.log(`  ${source.name}:`);
+          console.log(`    Sets:        ${source.stats.sets}`);
+          console.log(`    Exercises:   ${source.stats.exercises}`);
+          console.log(`    Merge time:  ${phaseTime.toFixed(2)} ms`);
         }
-      }
-      if (perfSummary.memory) {
         console.log('');
-        console.log('Memory usage:');
-        console.log(`  Before: ${formatBytes(perfSummary.memory.before)}`);
-        console.log(`  After:  ${formatBytes(perfSummary.memory.after)}`);
-        console.log(`  Delta:  ${formatBytes(perfSummary.memory.delta)}`);
+        console.log('Phase timings:');
+        for (const [phase, time] of perf.phases) {
+          console.log(`  ${phase.padEnd(15)}: ${time.toFixed(2)} ms`);
+        }
+        if (perfSummary.rowCounts && Object.keys(perfSummary.rowCounts).length > 0) {
+          console.log('');
+          console.log('Rows processed per table:');
+          for (const [table, count] of Object.entries(perfSummary.rowCounts) as [string, number][]) {
+            console.log(`  ${table.padEnd(30)}: ${count.toString().padStart(6)} rows`);
+          }
+        }
+        if (perfSummary.memory) {
+          console.log('');
+          console.log('Memory usage:');
+          console.log(`  Before: ${formatBytes(perfSummary.memory.before)}`);
+          console.log(`  After:  ${formatBytes(perfSummary.memory.after)}`);
+          console.log(`  Delta:  ${formatBytes(perfSummary.memory.delta)}`);
+        }
+        console.log('═'.repeat(50));
       }
-      console.log('═'.repeat(50));
 
       const resultBaseIndex = base;
       return {

@@ -727,7 +727,7 @@ async function inspectBackup(bytes) {
 }
 async function mergeBackups(files, options = {}) {
   const { baseIndex, onProgress = () => {
-  } } = options;
+  }, logStats = true } = options;
   if (!Array.isArray(files) || files.length < 2) {
     throw new Error("pass at least two backups to merge");
   }
@@ -819,43 +819,45 @@ async function mergeBackups(files, options = {}) {
           delta: afterMem - beforeMem
         };
       }
-      console.log("\u{1F3CB}\uFE0F FitNotes Merger Performance Report");
-      console.log("\u2550".repeat(50));
-      console.log(`\u23F1  Total time:      ${perfSummary.totalDuration.toFixed(2)} ms`);
-      console.log(`\u{1F504}  Merge time:      ${perfSummary.mergeDuration.toFixed(2)} ms`);
-      console.log(`\u{1F4CA}  Operations:      ${perfSummary.totalOperations} total`);
-      console.log(`\u26A1  Ops/sec:         ${perfSummary.operationsPerSecond.toFixed(1)} ops/s`);
-      console.log(`\u{1F4C1}  Files merged:    ${files.length}`);
-      console.log(`\u{1F5C4}\uFE0F   Tables touched:  ${perfSummary.rowCounts ? Object.keys(perfSummary.rowCounts).length : "N/A"}`);
-      console.log("");
-      console.log("Per-file breakdown:");
-      for (const source of sources) {
-        const phaseTime = perf.phases.get(`merge_${source.index}`) ?? 0;
-        console.log(`  ${source.name}:`);
-        console.log(`    Sets:        ${source.stats.sets}`);
-        console.log(`    Exercises:   ${source.stats.exercises}`);
-        console.log(`    Merge time:  ${phaseTime.toFixed(2)} ms`);
-      }
-      console.log("");
-      console.log("Phase timings:");
-      for (const [phase, time] of perf.phases) {
-        console.log(`  ${phase.padEnd(15)}: ${time.toFixed(2)} ms`);
-      }
-      if (perfSummary.rowCounts && Object.keys(perfSummary.rowCounts).length > 0) {
+      if (logStats) {
+        console.log("\u{1F3CB}\uFE0F FitNotes Merger Performance Report");
+        console.log("\u2550".repeat(50));
+        console.log(`\u23F1  Total time:      ${perfSummary.totalDuration.toFixed(2)} ms`);
+        console.log(`\u{1F504}  Merge time:      ${perfSummary.mergeDuration.toFixed(2)} ms`);
+        console.log(`\u{1F4CA}  Operations:      ${perfSummary.totalOperations} total`);
+        console.log(`\u26A1  Ops/sec:         ${perfSummary.operationsPerSecond.toFixed(1)} ops/s`);
+        console.log(`\u{1F4C1}  Files merged:    ${files.length}`);
+        console.log(`\u{1F5C4}\uFE0F   Tables touched:  ${perfSummary.rowCounts ? Object.keys(perfSummary.rowCounts).length : "N/A"}`);
         console.log("");
-        console.log("Rows processed per table:");
-        for (const [table, count2] of Object.entries(perfSummary.rowCounts)) {
-          console.log(`  ${table.padEnd(30)}: ${count2.toString().padStart(6)} rows`);
+        console.log("Per-file breakdown:");
+        for (const source of sources) {
+          const phaseTime = perf.phases.get(`merge_${source.index}`) ?? 0;
+          console.log(`  ${source.name}:`);
+          console.log(`    Sets:        ${source.stats.sets}`);
+          console.log(`    Exercises:   ${source.stats.exercises}`);
+          console.log(`    Merge time:  ${phaseTime.toFixed(2)} ms`);
         }
-      }
-      if (perfSummary.memory) {
         console.log("");
-        console.log("Memory usage:");
-        console.log(`  Before: ${formatBytes(perfSummary.memory.before)}`);
-        console.log(`  After:  ${formatBytes(perfSummary.memory.after)}`);
-        console.log(`  Delta:  ${formatBytes(perfSummary.memory.delta)}`);
+        console.log("Phase timings:");
+        for (const [phase, time] of perf.phases) {
+          console.log(`  ${phase.padEnd(15)}: ${time.toFixed(2)} ms`);
+        }
+        if (perfSummary.rowCounts && Object.keys(perfSummary.rowCounts).length > 0) {
+          console.log("");
+          console.log("Rows processed per table:");
+          for (const [table, count2] of Object.entries(perfSummary.rowCounts)) {
+            console.log(`  ${table.padEnd(30)}: ${count2.toString().padStart(6)} rows`);
+          }
+        }
+        if (perfSummary.memory) {
+          console.log("");
+          console.log("Memory usage:");
+          console.log(`  Before: ${formatBytes(perfSummary.memory.before)}`);
+          console.log(`  After:  ${formatBytes(perfSummary.memory.after)}`);
+          console.log(`  Delta:  ${formatBytes(perfSummary.memory.delta)}`);
+        }
+        console.log("\u2550".repeat(50));
       }
-      console.log("\u2550".repeat(50));
       const resultBaseIndex = base;
       return {
         bytes: merged.export(),
