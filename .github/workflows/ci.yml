@@ -18,4 +18,6 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install
+      - name: Check app.js is up to date
+        run: pnpm build && git diff --exit-code -- app.js
       - run: pnpm test

@@ -9,8 +9,11 @@
 
 import type { Database as SqlJsDatabase } from 'sql.js';
 
-const VENDOR_SCRIPT = new URL('../../vendor/sql-wasm.js', import.meta.url).href;
-const VENDOR_DIR = new URL('../../vendor/', import.meta.url).href;
+/**
+ * Vendored assets are resolved against the page URL, not the module path, so
+ * the browser bundle can be emitted anywhere (page root, subpath, dist/...).
+ */
+const vendorUrl = (path: string): string => new URL(`vendor/${path}`, document.baseURI).href;
 
 declare global {
   // eslint-disable-next-line no-var
@@ -38,7 +41,7 @@ async function loadRuntime(): Promise<InitSqlJs> {
   runtimePromise = (async () => {
     if (globalThis.initSqlJs) return globalThis.initSqlJs as InitSqlJs;
     if (isBrowser()) {
-      await injectScript(VENDOR_SCRIPT);
+      await injectScript(vendorUrl('sql-wasm.js'));
       if (!globalThis.initSqlJs) throw new Error('vendor/sql-wasm.js did not expose initSqlJs');
       return globalThis.initSqlJs as InitSqlJs;
     }
@@ -55,7 +58,7 @@ export function getSqlite(): Promise<{ Database: typeof SqlJsDatabase }> {
   if (!sqlitePromise) {
     sqlitePromise = loadRuntime().then(
       (init) =>
-        init(isBrowser() ? { locateFile: (file: string) => VENDOR_DIR + file } : {}),
+        init(isBrowser() ? { locateFile: (file: string) => vendorUrl(file) } : {}),
     );
   }
   return sqlitePromise;
